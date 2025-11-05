@@ -12,11 +12,13 @@ const MonacoEditor: React.FC = () => {
     if (!editorRef.current || !selectedFilePath) return;
 
     const content = getFileContent(selectedFilePath) || '';
+    const language = selectedFilePath.endsWith('.tsx') ? 'typescript' : 'javascript';
 
     if (!monacoRef.current) {
+      // Create editor
       monacoRef.current = monaco.editor.create(editorRef.current, {
         value: content,
-        language: selectedFilePath.endsWith('.tsx') ? 'typescript' : 'javascript',
+        language,
         theme: 'vs-dark',
         automaticLayout: true,
         minimap: { enabled: false },
@@ -30,13 +32,19 @@ const MonacoEditor: React.FC = () => {
         }
       });
     } else {
+      // Update existing editor
       const model = monacoRef.current.getModel();
-      if (model?.getValue() !== content) {
-        model?.setValue(content);
+      if (model) {
+        if (model.getValue() !== content) {
+          model.setValue(content);
+        }
+        const currentLang = monaco.editor.getModelLanguage(model);
+        if (currentLang !== language) {
+          monaco.editor.setModelLanguage(model, language);
+        }
       }
-      monaco.editor.setModelLanguage(model!, selectedFilePath.endsWith('.tsx') ? 'typescript' : 'javascript');
     }
-  }, [selectedFilePath]);
+  }, [selectedFilePath, getFileContent, updateFile]);
 
   useEffect(() => {
     return () => {
