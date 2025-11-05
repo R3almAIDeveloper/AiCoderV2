@@ -1,85 +1,50 @@
-import React, { useState } from 'react';
-import { Globe, RefreshCw, ExternalLink, Smartphone, Monitor } from 'lucide-react';
+// src/components/Preview.tsx
+import React, { useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { useWebContainer } from '../hooks/useWebContainer';
 
-interface PreviewProps {
-  url: string;
-}
+const Preview: React.FC = () => {
+  const { iframeRef, startContainer, isReady } = useWebContainer();
+  const [url, setUrl] = useState<string | null>(null);
 
-export const Preview: React.FC<PreviewProps> = ({ url }) => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    // Simulate refresh delay
-    setTimeout(() => setIsRefreshing(false), 1000);
-  };
+  useEffect(() => {
+    if (isReady) {
+      setUrl('/__webcontainer__/index.html');
+    }
+  }, [isReady]);
 
   return (
-    <div className="h-full bg-gray-800">
-      {/* Header */}
-      <div className="border-b border-gray-700 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Globe className="w-5 h-5 text-gray-400" />
-            <h2 className="text-sm font-semibold text-white">Preview</h2>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setIsMobile(!isMobile)}
-              className={`p-1 rounded ${isMobile ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-              title="Mobile view"
-            >
-              <Smartphone className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setIsMobile(false)}
-              className={`p-1 rounded ${!isMobile ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
-              title="Desktop view"
-            >
-              <Monitor className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleRefresh}
-              className="text-gray-400 hover:text-white p-1"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-            {url && (
-              <button
-                onClick={() => window.open(url, '_blank')}
-                className="text-gray-400 hover:text-white p-1"
-                title="Open in new tab"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
+    <div className="h-full bg-white flex flex-col">
+      <div className="bg-gray-800 text-white px-3 py-1.5 text-xs flex items-center justify-between border-b border-gray-700">
+        <span className="font-medium">Preview</span>
+        <button
+          onClick={startContainer}
+          className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 hover:bg-blue-700 rounded text-xs transition-colors"
+          title="Restart WebContainer"
+        >
+          <RefreshCw className="w-3 h-3" />
+          Restart
+        </button>
       </div>
 
-      {/* Preview Content */}
-      <div className="h-full bg-white">
-        {url ? (
-          <div className={`h-full ${isMobile ? 'max-w-sm mx-auto' : ''}`}>
-            <iframe
-              src={url}
-              className="w-full h-full border-0"
-              title="Preview"
-              key={isRefreshing ? Date.now() : 'preview'}
-            />
+      {url ? (
+        <iframe
+          ref={iframeRef}
+          src={url}
+          className="flex-1 w-full border-0"
+          title="Live Preview"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
+        />
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+            <p>Starting WebContainer...</p>
           </div>
-        ) : (
-          <div className="h-full flex items-center justify-center text-gray-500 bg-gray-100">
-            <div className="text-center">
-              <Globe className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Preview will appear here</p>
-              <p className="text-sm mt-2">Generate some code to see it live!</p>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
+
+export default Preview;

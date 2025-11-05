@@ -9,36 +9,33 @@ import Preview from './Preview';
 const Layout: React.FC = () => {
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
-      {/* Optional top bar (you can remove if you don’t need it) */}
+      {/* Header */}
       <header className="border-b border-gray-800 px-4 py-2 flex items-center justify-between">
         <h1 className="text-xl font-bold">AiCoderV2</h1>
-        <span className="text-xs text-gray-500">xAI powered</span>
+        <span className="text-xs text-gray-500">xAI + WebContainer</span>
       </header>
 
-      {/* Main split-pane layout */}
+      {/* Main Layout */}
       <PanelGroup direction="horizontal" className="flex-1">
-        {/* ---- Left: Chat ---- */}
+        {/* Chat */}
         <Panel defaultSize={25} minSize={20}>
           <ChatInterface />
         </Panel>
-
         <PanelResizeHandle className="w-1 bg-gray-800 hover:bg-blue-600 transition-colors" />
 
-        {/* ---- Center-Left: File Tree ---- */}
+        {/* File Tree */}
         <Panel defaultSize={20} minSize={15}>
           <FileTree />
         </Panel>
-
         <PanelResizeHandle className="w-1 bg-gray-800 hover:bg-blue-600 transition-colors" />
 
-        {/* ---- Center-Right: Editor ---- */}
+        {/* Editor */}
         <Panel defaultSize={35} minSize={25}>
           <MonacoEditor />
         </Panel>
-
         <PanelResizeHandle className="w-1 bg-gray-800 hover:bg-blue-600 transition-colors" />
 
-        {/* ---- Right: Preview ---- */}
+        {/* Preview */}
         <Panel defaultSize={20} minSize={15}>
           <Preview />
         </Panel>
