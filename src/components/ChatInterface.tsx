@@ -11,7 +11,10 @@ interface Message {
   timestamp: Date;
 }
 
-export default function ChatInterface() {
+/* -------------------------------------------------------------
+   NAMED EXPORT – this is what Layout.tsx imports
+   ------------------------------------------------------------- */
+export const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,60 +24,59 @@ export default function ChatInterface() {
 
   const { addFile, selectFile } = useFileTree();
 
-  // Auto-scroll to bottom
+  // ---- Auto-scroll -------------------------------------------------
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Focus input on mount
+  // ---- Focus input on mount ----------------------------------------
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  // ---- Send prompt -------------------------------------------------
   const handleSend = async () => {
     if (!input.trim() || loading) return;
 
-    const userMessage: Message = {
+    const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
       content: input.trim(),
       timestamp: new Date(),
     };
-
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((p) => [...p, userMsg]);
     setInput('');
     setLoading(true);
 
     try {
       const code = await generateCode(input.trim(), { model: selectedModel });
 
-      const assistantMessage: Message = {
+      const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: code,
         timestamp: new Date(),
       };
+      setMessages((p) => [...p, assistantMsg]);
 
-      setMessages((prev) => [...prev, assistantMessage]);
-
-      // Auto-create file from AI response
+      // ---- Auto-create file ---------------------------------------
       const fileName = extractFileName(input.trim()) || 'Component.tsx';
       addFile(fileName, code);
       selectFile(fileName);
-
-    } catch (error: any) {
-      const errorMessage: Message = {
+    } catch (err: any) {
+      const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Error: ${error.message}`,
+        content: `Error: ${err.message}`,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((p) => [...p, errMsg]);
     } finally {
       setLoading(false);
     }
   };
 
+  // ---- Keyboard shortcuts -----------------------------------------
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -82,14 +84,11 @@ export default function ChatInterface() {
     }
   };
 
-  const copyToClipboard = (content: string) => {
-    navigator.clipboard.writeText(content);
-  };
+  // ---- Helpers ----------------------------------------------------
+  const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
+  const clearChat = () => setMessages([]);
 
-  const clearChat = () => {
-    setMessages([]);
-  };
-
+  // ----------------------------------------------------------------
   return (
     <div className="flex flex-col h-full bg-gray-900 text-gray-100">
       {/* Header */}
@@ -98,6 +97,7 @@ export default function ChatInterface() {
           <Bot className="w-6 h-6 text-blue-400" />
           <h2 className="text-lg font-semibold">AI Assistant</h2>
         </div>
+
         <div className="flex items-center gap-2">
           <select
             value={selectedModel}
@@ -105,12 +105,13 @@ export default function ChatInterface() {
             disabled={loading}
             className="px-3 py-1.5 bg-gray-800 text-white text-sm rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           >
-            {AVAILABLE_MODELS.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
+            {AVAILABLE_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
               </option>
             ))}
           </select>
+
           <button
             onClick={clearChat}
             className="p-2 text-gray-400 hover:text-white transition-colors"
@@ -126,8 +127,12 @@ export default function ChatInterface() {
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-10">
             <Bot className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-            <p className="text-sm">Ask me to generate a component, fix code, or explain anything.</p>
-            <p className="text-xs mt-2">Try: "Create a dark mode toggle with Tailwind"</p>
+            <p className="text-sm">
+              Ask me to generate a component, fix code, or explain anything.
+            </p>
+            <p className="text-xs mt-2">
+              Try: "Create a dark mode toggle with Tailwind"
+            </p>
           </div>
         )}
 
@@ -143,6 +148,7 @@ export default function ChatInterface() {
                 <Bot className="w-5 h-5 text-white" />
               </div>
             )}
+
             <div
               className={`max-w-xs md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg ${
                 msg.role === 'user'
@@ -150,13 +156,14 @@ export default function ChatInterface() {
                   : 'bg-gray-800 text-gray-100'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap font-mono text-xs md:text-sm">
-                {msg.role === 'assistant' && msg.content.startsWith('Error:') ? (
+              <pre className="whitespace-pre-wrap font-mono text-xs md:text-sm">
+                {msg.content.startsWith('Error:') ? (
                   <span className="text-red-400">{msg.content}</span>
                 ) : (
                   msg.content
                 )}
-              </p>
+              </pre>
+
               {msg.role === 'assistant' && !msg.content.startsWith('Error:') && (
                 <button
                   onClick={() => copyToClipboard(msg.content)}
@@ -167,6 +174,7 @@ export default function ChatInterface() {
                 </button>
               )}
             </div>
+
             {msg.role === 'user' && (
               <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center flex-shrink-0">
                 <User className="w-5 h-5 text-white" />
@@ -200,7 +208,7 @@ export default function ChatInterface() {
             placeholder="Describe the component you want..."
             disabled={loading}
             rows={1}
-            className="flex-1 px-4 py-2 bg-gray-800 text-white placeholder-gray-500 border border-gray-700 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2 bg-gray-800 text-white placeholder-gray-500 border border-gray-700 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
@@ -221,13 +229,13 @@ export default function ChatInterface() {
       </div>
     </div>
   );
-}
+};
 
-// Helper: Extract a reasonable filename from prompt
+/* -------------------------------------------------------------
+   Helper – guess a sensible filename from the prompt
+   ------------------------------------------------------------- */
 function extractFileName(prompt: string): string | null {
   const lower = prompt.toLowerCase();
-
-  // Match common patterns
   const patterns = [
     /create a (.+?) component/,
     /build a (.+?) with/,
@@ -236,22 +244,21 @@ function extractFileName(prompt: string): string | null {
     /a (.+?) with tailwind/,
   ];
 
-  for (const pattern of patterns) {
-    const match = lower.match(pattern);
-    if (match) {
-      const name = match[1]
+  for (const p of patterns) {
+    const m = lower.match(p);
+    if (m) {
+      const name = m[1]
         .split(' ')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join('');
       return `${name}.tsx`;
     }
   }
 
-  // Fallback: use first few words
+  // fallback
   const words = prompt.split(' ').slice(0, 3);
-  if (words.length > 0) {
+  if (words.length) {
     return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('') + '.tsx';
   }
-
   return null;
 }
