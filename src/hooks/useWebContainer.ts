@@ -5,6 +5,9 @@ import { useEffect, useState, useRef } from 'react';
 let _instance: WebContainer | null = null;
 let _bootPromise: Promise<WebContainer> | null = null;
 
+/** --------------------------------------------------------------
+ *  1. Boot + mount **once** and return the instance
+ *  -------------------------------------------------------------- */
 const getWebContainer = async (): Promise<WebContainer> => {
   if (_instance) return _instance;
   if (_bootPromise) return _bootPromise;
@@ -15,7 +18,9 @@ const getWebContainer = async (): Promise<WebContainer> => {
 
   console.log('[WebContainer] Booting…');
 
+  // ----------  MOUNT A VALID PROJECT ----------
   await wc.mount({
+    // ---- package.json (plugin as **dependency**) ----
     'package.json': {
       file: {
         contents: JSON.stringify(
@@ -30,10 +35,10 @@ const getWebContainer = async (): Promise<WebContainer> => {
             dependencies: {
               react: '^18.3.1',
               'react-dom': '^18.3.1',
+              '@vitejs/plugin-react': '^4.3.2',   // <-- moved here
             },
             devDependencies: {
               vite: '^5.4.8',
-              '@vitejs/plugin-react': '^4.3.2',
               typescript: '^5.5.4',
             },
           },
@@ -43,6 +48,7 @@ const getWebContainer = async (): Promise<WebContainer> => {
       },
     },
 
+    // ---- vite.config.ts ----
     'vite.config.ts': {
       file: {
         contents: `import { defineConfig } from 'vite';
@@ -57,6 +63,7 @@ export default defineConfig({
       },
     },
 
+    // ---- tsconfig.json ----
     'tsconfig.json': {
       file: {
         contents: JSON.stringify(
@@ -78,6 +85,7 @@ export default defineConfig({
       },
     },
 
+    // ---- index.html ----
     'index.html': {
       file: {
         contents: `<!DOCTYPE html>
@@ -95,6 +103,7 @@ export default defineConfig({
       },
     },
 
+    // ---- src folder ----
     src: {
       directory: {
         'main.tsx': {
@@ -119,7 +128,9 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-8">
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
           <h1 className="text-4xl font-bold text-gray-800 mb-4">AiCoderV2 Ready!</h1>
-          <p className="text-lg text-gray-600">WebContainer running on <strong>port 3000</strong>.</p>
+          <p className="text-lg text-gray-600">
+            WebContainer running on <strong>port 3000</strong>.
+          </p>
         </div>
       </div>
     </Layout>
@@ -149,23 +160,41 @@ export default function Layout({ children }: LayoutProps) {
     },
   });
 
+  // ----------  INSTALL ----------
   console.log('[WebContainer] npm install…');
   const install = await wc.spawn('npm', ['install']);
   const installExit = await install.exit;
-  if (installExit !== 0) throw new Error(`npm install failed (code ${installExit})`);
+  if (installExit !== 0) {
+    throw new Error(`npm install failed (code ${installExit})`);
+  }
 
+  // ----------  START VITE ----------
   console.log('[WebContainer] Starting Vite on port 3000…');
   const dev = await wc.spawn('npm', ['run', 'dev']);
 
-  dev.output.pipeTo(
-    new WritableStream({
-      write(chunk) {
-        const text = new TextDecoder().decode(chunk);
-        console.log('[Vite]', text);
-      },
-    })
-  );
+  // Safe pipe (fallback if WritableStream missing)
+  if (typeof WritableStream !== 'undefined') {
+    dev.output.pipeTo(
+      new WritableStream({
+        write(chunk) {
+          const text = new TextDecoder().decode(chunk);
+          console.log('[Vite]', text);
+        },
+      })
+    );
+  } else {
+    // Fallback: read chunks manually
+    const reader = dev.output.getReader();
+    (async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        console.log('[Vite]', new TextDecoder().decode(value));
+      }
+    })();
+  }
 
+  // ----------  SERVER READY ----------
   wc.on('server-ready', (port, url) => {
     console.log(`[WebContainer] Server ready → ${url} (port ${port})`);
     window.postMessage({ type: 'serverReady', url, port }, '*');
@@ -174,12 +203,15 @@ export default function Layout({ children }: LayoutProps) {
   return wc;
 };
 
+/** --------------------------------------------------------------
+ *  2. React hook – only expose ready state & URL
+ *  -------------------------------------------------------------- */
 export function useWebContainer() {
   const [container, setContainer] = useState<WebContainer | null>(null);
   const [ready, setReady] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
-  const serverStarted = useRef(false);
 
+  // Boot once
   useEffect(() => {
     let mounted = true;
     getWebContainer()
@@ -195,6 +227,7 @@ export function useWebContainer() {
     };
   }, []);
 
+  // Listen for server-ready
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       if (e.data.type === 'serverReady' && e.data.url) {
@@ -205,23 +238,9 @@ export function useWebContainer() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const installDependencies = async () => {
-    if (!container) return;
-    const proc = await container.spawn('npm', ['install']);
-    await proc.exit;
-  };
-
-  const startDevServer = async () => {
-    if (!container || serverStarted.current) return;
-    serverStarted.current = true;
-    await container.spawn('npm', ['run', 'dev']);
-  };
-
   return {
     container,
     ready,
     url,
-    installDependencies,
-    startDevServer,
   };
 }

@@ -1,64 +1,64 @@
 // src/services/fileService.ts
-import { FileSystemTree } from '@webcontainer/api';
-import { webContainer } from '../hooks/useWebContainer';
+import { WebContainer } from '@webcontainer/api';
+import { aiService } from './aiService';
 
-export interface FileNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  children?: FileNode[];
-}
+export class FileService {
+  private wc: WebContainer | null = null;
+  private files = new Map<string, string>(); // path → content
 
-let fsTree: FileSystemTree = {};
+  constructor(wc: WebContainer) {
+    this.wc = wc;
+  }
 
-/** Refresh the in-memory file tree from WebContainer */
-export async function refreshFileTree(): Promise<FileNode> {
-  const instance = await webContainer;
-  fsTree = await instance.fs.readDir('/', { withFileTypes: true });
-  return buildTree('/', fsTree);
-}
+  /** Write a file and keep it in memory */
+  async write(path: string, content: string) {
+    this.files.set(path, content);
 
-/** Convert WebContainer Dirent tree → UI-friendly structure */
-function buildTree(basePath: string, tree: FileSystemTree): FileNode {
-  const entries = Object.entries(tree);
-  const children: FileNode[] = [];
-
-  for (const [name, entry] of entries) {
-    const path = `${basePath}${basePath === '/' ? '' : '/'}${name}`;
-    if ('directory' in entry) {
-      children.push({
-        name,
-        path,
-        type: 'directory',
-        children: buildTree(path, entry.directory).children,
-      });
-    } else {
-      children.push({ name, path, type: 'file' });
+    // Create parent dirs if needed
+    const dirs = path.split('/').slice(0, -1);
+    let current = '';
+    for (const dir of dirs) {
+      current += (current ? '/' : '') + dir;
+      await this.wc?.fs.mkdir(current, { recursive: true });
     }
+
+    await this.wc?.fs.writeFile(path, content);
   }
 
-  return { name: basePath.split('/').pop() || '/', path: basePath, type: 'directory', children };
-}
+  /** Apply AI-generated component */
+  async applyAIResponse(resp: { code: string; filename: string }) {
+    const path = `src/components/${resp.filename}`;
+    await this.write(path, resp.code);
 
-/** Read file content as string */
-export async function readFile(path: string): Promise<string> {
-  const instance = await webContainer;
-  const buf = await instance.fs.readFile(path);
-  return new TextDecoder().decode(buf);
-}
-
-/** Write or create file (with auto-mkdir) */
-export async function writeFile(path: string, content: string): Promise<void> {
-  const instance = await webContainer;
-  const dir = path.split('/').slice(0, -1).join('/');
-  if (dir) {
-    await instance.fs.mkdir(dir, { recursive: true });
+    // Auto-import into App.tsx
+    await this.updateAppImport(resp.filename.replace(/\.tsx$/, ''));
   }
-  await instance.fs.writeFile(path, content);
+
+  /** Add import + render the new component in App */
+  private async updateAppImport(componentName: string) {
+    const appPath = 'src/App.tsx';
+    let appCode = this.files.get(appPath) ?? (await this.wc?.fs.readFile(appPath, 'utf-8')) ?? '';
+
+    const importLine = `import ${componentName} from './components/${componentName}';\n`;
+    if (!appCode.includes(importLine.trim())) {
+      const lastImport = appCode.match(/import .*?;\n?/g)?.pop() ?? '';
+      appCode = appCode.replace(lastImport, lastCode + importLine);
+    }
+
+    const renderTag = `<${componentName} />`;
+    if (!appCode.includes(renderTag)) {
+      appCode = appCode.replace(
+        /return\s*\(/,
+        `return (\n  <>\n    ${renderTag}\n    `
+      ).replace(/<\s*\/>\s*\)/, `</>\n  </>\n)`);
+    }
+
+    await this.write(appPath, appCode);
+  }
 }
 
-/** Optional: Delete file */
-export async function deleteFile(path: string): Promise<void> {
-  const instance = await webContainer;
-  await instance.fs.rm(path);
-}
+let _instance: FileService | null = null;
+export const getFileService = (wc: WebContainer) => {
+  if (!_instance) _instance = new FileService(wc);
+  return _instance;
+};

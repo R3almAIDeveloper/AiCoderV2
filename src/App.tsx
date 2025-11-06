@@ -1,17 +1,13 @@
 // src/App.tsx
-import React, { useEffect } from "react";
-import { Layout } from "./components/Layout";
+import React from 'react';
 
 export default function App() {
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.data.type === "serverReady" && e.data.url) {
-        window.postMessage(e.data, "*");
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, []);
-
-  return <Layout />;
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-8">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+        <h1 className="text-4xl font-bold text-gray-800 mb-4">AiCoderV2</h1>
+        <p className="text-lg text-gray-600">Type a prompt → AI builds → preview updates.</p>
+      </div>
+    </div>
+  );
 }
