@@ -61,6 +61,9 @@ export class FileService {
     }
 
     await this.write(appPath, code);
+
+    // Force Vite to re-scan
+    await this.wc?.fs.writeFile('vite.config.ts', (await this.wc?.fs.readFile('vite.config.ts', 'utf-8')) + '\n');
   }
 }
 

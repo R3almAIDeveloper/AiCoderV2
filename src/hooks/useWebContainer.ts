@@ -30,6 +30,11 @@ const getWebContainer = async (): Promise<WebContainer> => {
     },
   });
 
+  /* ---------- ENABLE HMR FOR AI-GENERATED COMPONENTS ---------- */
+  console.log('[WebContainer] Enabling HMR for src/components…');
+  await wc.fs.mkdir('src/components', { recursive: true });
+  await wc.fs.watch('src/components', { recursive: true });
+
   console.log('[WebContainer] npm install…');
   const install = await wc.spawn('npm', ['install']);
   if ((await install.exit) !== 0) throw new Error('npm install failed');

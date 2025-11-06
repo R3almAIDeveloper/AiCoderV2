@@ -4,27 +4,57 @@ import { useWebContainer } from '../hooks/useWebContainer';
 
 export default function FileTree() {
   const { container: wc } = useWebContainer();
-  const [tree, setTree] = useState<string[]>([]);
+  const [files, setFiles] = useState<string[]>([]);
 
   useEffect(() => {
     if (!wc) return;
-    (async () => {
-      const files = await wc.fs.readdir('src', { withFileTypes: true });
-      const paths = files
-        .filter((f) => f.isFile())
-        .map((f) => `src/${f.name}`);
-      setTree(paths);
-    })();
+
+    const loadFiles = async () => {
+      try {
+        const entries = await wc.fs.readdir('src/components', { withFileTypes: true });
+        const fileNames = entries
+          .filter(e => e.isFile())
+          .map(e => `src/components/${e.name}`);
+        setFiles(fileNames);
+      } catch (e) {
+        console.warn('FileTree: could not read components', e);
+      }
+    };
+
+    loadFiles();
+
+    // Watch for new files
+    const watcher = wc.fs.watch('src/components', { recursive: false });
+    const handleChange = () => loadFiles();
+
+    watcher.addEventListener('change', handleChange);
+
+    return () => {
+      watcher.removeEventListener('change', handleChange);
+      watcher.close();
+    };
   }, [wc]);
 
   return (
-    <div className="p-2 text-sm">
-      <div className="font-medium mb-1">src/</div>
-      {tree.map((path) => (
-        <div key={path} className="pl-4 hover:bg-gray-100 cursor-pointer">
-          {path.split('/').pop()}
+    <div className="p-3 text-sm font-mono">
+      <div className="font-semibold text-gray-700 mb-2">src/components/</div>
+      {files.length === 0 ? (
+        <div className="text-gray-400 italic">No components yet</div>
+      ) : (
+        <div className="space-y-1">
+          {files.map(path => {
+            const name = path.split('/').pop()!;
+            return (
+              <div
+                key={path}
+                className="pl-3 hover:bg-gray-200 cursor-pointer rounded px-2 py-1 text-blue-600"
+              >
+                {name}
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -11,12 +11,14 @@ export default function ChatInterface() {
     { role: 'user' | 'assistant'; content: string; loading?: boolean }[]
   >([]);
   const [isSending, setIsSending] = useState(false);
-  const { container: wc } = useWebContainer();
+  const { container: wc, ready, url } = useWebContainer(); // <-- use `ready` and `url`
   const fileService = wc ? getFileService(wc) : null;
+
+  const isReady = ready && !!url && !!fileService;
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !wc || !fileService || isSending) return;
+    if (!input.trim() || !isReady || isSending) return;
 
     const prompt = input.trim();
     setMessages(m => [...m, { role: 'user', content: prompt }]);
@@ -27,16 +29,11 @@ export default function ChatInterface() {
     try {
       const resp = await aiService.generateCode(prompt);
       if (!resp.filename) throw new Error('AI did not return filename');
-
-      // THIS LINE WRITES THE FILE
-      await fileService.applyAIResponse(resp);
+      await fileService!.applyAIResponse(resp);
 
       setMessages(m => [
         ...m.slice(0, -1),
-        {
-          role: 'assistant',
-          content: `Created \`${resp.filename}\` and added to preview!\n\n${resp.explanation}`,
-        },
+        { role: 'assistant', content: `Created \`${resp.filename}\` and added to preview!\n\n${resp.explanation}` },
       ]);
     } catch (err) {
       setMessages(m => [
@@ -50,23 +47,24 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full bg-white">
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !isReady ? (
           <div className="text-center text-gray-500 py-8">
-            <p className="mb-2">Ask me to build anything!</p>
+            <p className="font-medium text-lg">AiCoderV2 Ready!</p>
+            <p className="text-sm mt-1">WebContainer is booting… (first time ~30s)</p>
+          </div>
+        ) : messages.length === 0 && isReady ? (
+          <div className="text-center text-gray-500 py-8">
+            <p className="font-medium">Ask me to build anything!</p>
             <p className="text-sm">e.g., "Create a countdown timer from 60 seconds"</p>
           </div>
         ) : (
           messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-xs lg:max-w-md p-3 rounded-lg text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-800'
+                  msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'
                 }`}
               >
                 {msg.loading && <Loader2 className="w-4 h-4 animate-spin inline mr-2" />}
@@ -77,19 +75,22 @@ export default function ChatInterface() {
         )}
       </div>
 
+      {/* Input Form */}
       <form onSubmit={send} className="p-4 border-t flex items-center gap-2">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder="Type your prompt..."
-          className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          disabled={isSending}
-          autoFocus
+          placeholder={isReady ? "Type your prompt..." : "Booting WebContainer..."}
+          className={`flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+            !isReady ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+          }`}
+          disabled={!isReady || isSending}
+          autoFocus={isReady}
         />
         <button
           type="submit"
-          disabled={!input.trim() || isSending || !fileService}
-          className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1"
+          disabled={!isReady || !input.trim() || isSending}
+          className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
         >
           {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>
