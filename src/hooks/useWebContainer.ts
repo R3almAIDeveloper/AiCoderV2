@@ -15,7 +15,6 @@ const getWebContainer = async (): Promise<WebContainer> => {
 
   console.log('[WebContainer] Booting…');
 
-  /* ---------- MOUNT INITIAL PROJECT ---------- */
   await wc.mount({
     'package.json': { file: { contents: JSON.stringify({ name: 'aicoderv2', private: true, type: 'module', scripts: { dev: 'vite --host 0.0.0.0 --port 3000' }, dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1', '@vitejs/plugin-react': '^4.3.2' }, devDependencies: { vite: '^5.4.8', typescript: '^5.5.4' } }, null, 2) } },
     'vite.config.ts': { file: { contents: `import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\nexport default defineConfig({ plugins: [react()], server: { host: '0.0.0.0', port: 3000, strictPort: true } });` } },
@@ -30,23 +29,21 @@ const getWebContainer = async (): Promise<WebContainer> => {
     },
   });
 
-  /* ---------- ENABLE HMR FOR AI-GENERATED COMPONENTS ---------- */
-  console.log('[WebContainer] Enabling HMR for src/components…');
+  // ENABLE HMR
+  console.log('[WebContainer] Enabling HMR...');
   await wc.fs.mkdir('src/components', { recursive: true });
   await wc.fs.watch('src/components', { recursive: true });
 
   console.log('[WebContainer] npm install…');
   const install = await wc.spawn('npm', ['install']);
-  if ((await install.exit) !== 0) throw new Error('npm install failed');
+  if ((await install.exit) !== 0) throw new Error('install failed');
 
   console.log('[WebContainer] Starting Vite…');
   const dev = await wc.spawn('npm', ['run', 'dev']);
 
-  // ---- SAFE LOGGING (no double-reader) ----
   const decoder = new TextDecoder();
   let buffer = '';
-
-  const logChunk = (chunk: Uint8Array | ArrayBuffer) => {
+  const log = (chunk: Uint8Array | ArrayBuffer) => {
     if (chunk instanceof ArrayBuffer) chunk = new Uint8Array(chunk);
     if (!(chunk instanceof Uint8Array)) return;
     buffer += decoder.decode(chunk, { stream: true });
@@ -55,34 +52,16 @@ const getWebContainer = async (): Promise<WebContainer> => {
     lines.forEach(l => console.log('[Vite]', l));
   };
 
-  // Use **only one** of the two approaches
-  if (typeof WritableStream !== 'undefined') {
-    dev.output.pipeTo(
-      new WritableStream({ write: logChunk })
-    ).catch(() => {});   // ignore if pipe fails
-  } else {
-    // fallback manual reader
-    const reader = dev.output.getReader();
-    (async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          logChunk(value);
-        }
-      } catch {}
-    })();
-  }
+  dev.output.pipeTo(new WritableStream({ write: log })).catch(() => {});
 
   wc.on('server-ready', (port, url) => {
-    console.log(`[WebContainer] Server ready → ${url}`);
+    console.log(`[WebContainer] Ready → ${url}`);
     window.postMessage({ type: 'serverReady', url, port }, '*');
   });
 
   return wc;
 };
 
-/* ---------- REACT HOOK ---------- */
 export function useWebContainer() {
   const [container, setContainer] = useState<WebContainer | null>(null);
   const [ready, setReady] = useState(false);
@@ -102,7 +81,7 @@ export function useWebContainer() {
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      if (e.data.type === 'serverReady' && e.data.url) setUrl(e.data.url);
+      if (e.data.type === 'serverReady') setUrl(e.data.url);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);

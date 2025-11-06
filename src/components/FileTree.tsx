@@ -9,50 +9,34 @@ export default function FileTree() {
   useEffect(() => {
     if (!wc) return;
 
-    const loadFiles = async () => {
+    const load = async () => {
       try {
         const entries = await wc.fs.readdir('src/components', { withFileTypes: true });
-        const fileNames = entries
-          .filter(e => e.isFile())
-          .map(e => `src/components/${e.name}`);
-        setFiles(fileNames);
-      } catch (e) {
-        console.warn('FileTree: could not read components', e);
-      }
+        setFiles(entries.filter(e => e.isFile()).map(e => e.name));
+      } catch {}
     };
 
-    loadFiles();
-
-    // Watch for new files
-    const watcher = wc.fs.watch('src/components', { recursive: false });
-    const handleChange = () => loadFiles();
-
-    watcher.addEventListener('change', handleChange);
-
+    load();
+    const watcher = wc.fs.watch('src/components');
+    watcher.addEventListener('change', load);
     return () => {
-      watcher.removeEventListener('change', handleChange);
+      watcher.removeEventListener('change', load);
       watcher.close();
     };
   }, [wc]);
 
   return (
-    <div className="p-3 text-sm font-mono">
-      <div className="font-semibold text-gray-700 mb-2">src/components/</div>
+    <div className="p-3 text-sm">
+      <div className="font-semibold mb-2">src/components/</div>
       {files.length === 0 ? (
-        <div className="text-gray-400 italic">No components yet</div>
+        <div className="text-gray-400 italic">No files</div>
       ) : (
         <div className="space-y-1">
-          {files.map(path => {
-            const name = path.split('/').pop()!;
-            return (
-              <div
-                key={path}
-                className="pl-3 hover:bg-gray-200 cursor-pointer rounded px-2 py-1 text-blue-600"
-              >
-                {name}
-              </div>
-            );
-          })}
+          {files.map(f => (
+            <div key={f} className="pl-3 hover:bg-gray-200 rounded px-2 py-1 cursor-pointer text-blue-600">
+              {f}
+            </div>
+          ))}
         </div>
       )}
     </div>
