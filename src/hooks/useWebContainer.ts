@@ -1,6 +1,6 @@
 // src/hooks/useWebContainer.ts
 import { WebContainer } from '@webcontainer/api';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 let _instance: WebContainer | null = null;
 let _bootPromise: Promise<WebContainer> | null = null;
@@ -15,6 +15,7 @@ const getWebContainer = async (): Promise<WebContainer> => {
 
   console.log('[WebContainer] Booting…');
 
+  // Mount initial project
   await wc.mount({
     'package.json': {
       file: {
@@ -69,21 +70,52 @@ export default defineConfig({ plugins: [react()], server: { host: '0.0.0.0', por
     },
     src: {
       directory: {
-        'main.tsx': { file: { contents: `import React from 'react'; import ReactDOM from 'react-dom/client'; import App from './App'; ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);` } },
-        'App.tsx': { file: { contents: `import React from 'react'; export default function App() { return <div className="p-8">AiCoderV2 Ready!</div>; }` } },
-        components: { directory: { 'Layout.tsx': { file: { contents: `import React, { ReactNode } from 'react'; export default function Layout({ children }: { children: ReactNode }) { return <>{children}</>; }` } } } },
+        'main.tsx': {
+          file: {
+            contents: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);`,
+          },
+        },
+        'App.tsx': {
+          file: {
+            contents: `import React from 'react';
+import Layout from './components/Layout';
+export default function App() {
+  return <Layout><div className="p-8 text-center">AiCoderV2 Ready!</div></Layout>;
+}`,
+          },
+        },
+        components: {
+          directory: {
+            'Layout.tsx': {
+              file: {
+                contents: `import React, { ReactNode } from 'react';
+export default function Layout({ children }: { children: ReactNode }) {
+  return <div className="min-h-screen">{children}</div>;
+}`,
+              },
+            },
+          },
+        },
       },
     },
   });
 
+  console.log('[WebContainer] npm install…');
+  const install = await wc.spawn('npm', ['install']);
+  const installExit = await install.exit;
+  if (installExit !== 0) throw new Error(`npm install failed (code ${installExit})`);
+
   console.log('[WebContainer] Starting Vite…');
   const dev = await wc.spawn('npm', ['run', 'dev']);
-  
-  // SAFE OUTPUT PIPE (handles Uint8Array | ArrayBuffer | string)
+
+  // === SAFE OUTPUT LOGGING ===
   const decoder = new TextDecoder();
   let buffer = '';
-  
-  const safeWrite = (chunk: Uint8Array | ArrayBuffer) => {
+
+  const safeLog = (chunk: Uint8Array | ArrayBuffer) => {
     if (chunk instanceof ArrayBuffer) chunk = new Uint8Array(chunk);
     if (!(chunk instanceof Uint8Array)) return;
     buffer += decoder.decode(chunk, { stream: true });
@@ -91,36 +123,66 @@ export default defineConfig({ plugins: [react()], server: { host: '0.0.0.0', por
     buffer = lines.pop() ?? '';
     lines.forEach(line => console.log('[Vite]', line));
   };
-  
+
   if (typeof WritableStream !== 'undefined') {
     try {
       dev.output.pipeTo(
-        new WritableStream({
-          write(chunk) {
-            safeWrite(chunk);
-          },
-        })
+        new WritableStream({ write: safeLog })
       ).catch(() => {});
-    } catch {
-      // fallback below
-    }
+    } catch {}
   }
-  
-  // Fallback reader for older browsers
+
+  // Fallback reader
   const reader = dev.output.getReader();
   (async () => {
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        safeWrite(value);
+        safeLog(value);
       }
     } catch {}
   })();
-  
+
+  // === SERVER READY ===
   wc.on('server-ready', (port, url) => {
-    console.log(`[WebContainer] Ready → ${url}`);
+    console.log(`[WebContainer] Server ready → ${url} (port ${port})`);
     window.postMessage({ type: 'serverReady', url, port }, '*');
   });
-  
+
   return wc;
+};
+
+// === React Hook ===
+export function useWebContainer() {
+  const [container, setContainer] = useState<WebContainer | null>(null);
+  const [ready, setReady] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getWebContainer()
+      .then((wc) => {
+        if (!mounted) return;
+        setContainer(wc);
+        setReady(true);
+      })
+      .catch((e) => console.error('[WebContainer] boot error', e));
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data.type === 'serverReady' && e.data.url) {
+        setUrl(e.data.url);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  return { container, ready, url };
+}
