@@ -26,8 +26,8 @@ export default function FileTree() {
   }, [wc]);
 
   return (
-    <div className="p-3 text-sm">
-      <div className="font-semibold mb-2">src/components/</div>
+    <div className="p-3 text-sm font-mono">
+      <div className="font-semibold mb-2 text-gray-700">src/components/</div>
       {files.length === 0 ? (
         <div className="text-gray-400 italic">No files</div>
       ) : (
