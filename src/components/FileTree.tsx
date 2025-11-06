@@ -1,67 +1,34 @@
 // src/components/FileTree.tsx
-import React from 'react';
-import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react';
-import { useFileTree } from '../hooks/useFileTree';
+import React from "react";
+import { FileNode } from "../types";
+import { ChevronRight, ChevronDown, File, Folder } from "lucide-react";
 
-interface FileNode {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  children?: FileNode[];
-  open?: boolean;
+interface Props {
+  node: FileNode;
+  onFileClick: (path: string) => void;
+  depth: number;
 }
 
-const FileTreeNode: React.FC<{ node: FileNode; level: number }> = ({ node, level }) => {
-  const { toggleFolder, selectFile, selectedFilePath } = useFileTree();
+export const FileTree: React.FC<Props> = ({ node, onFileClick, depth }) => {
+  const [open, setOpen] = React.useState(true);
+  const isDir = node.type === "directory";
+  const Icon = isDir ? (open ? ChevronDown : ChevronRight) : File;
 
-  const isSelected = selectedFilePath === node.path;
-  const isOpen = node.open;
-
-  if (node.type === 'directory') {
-    return (
-      <div>
-        <div
-          onClick={() => toggleFolder(node.path)}
-          className="flex items-center gap-1 px-2 py-1 hover:bg-gray-800 cursor-pointer select-none"
-          style={{ paddingLeft: `${level * 16}px` }}
-        >
-          {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          <Folder className="w-4 h-4 text-yellow-500" />
+  return (
+    <div style={{ paddingLeft: `${depth * 12}px` }}>
+      {isDir ? (
+        <div className="flex items-center gap-1 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-1 py-0.5" onClick={() => setOpen(!open)}>
+          <Icon className="w-4 h-4" />
+          <Folder className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
           <span className="text-sm">{node.name}</span>
         </div>
-        {isOpen &&
-          node.children?.map((child) => (
-            <FileTreeNode key={child.path} node={child} level={level + 1} />
-          ))}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      onClick={() => selectFile(node.path)}
-      className={`flex items-center gap-1 px-2 py-1 hover:bg-gray-800 cursor-pointer select-none ${
-        isSelected ? 'bg-blue-900' : ''
-      }`}
-      style={{ paddingLeft: `${level * 16}px` }}
-    >
-      <File className="w-4 h-4 text-gray-400" />
-      <span className="text-sm">{node.name}</span>
+      ) : (
+        <div className="flex items-center gap-1 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-1 py-0.5" onClick={() => onFileClick(node.path)}>
+          <File className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          <span className="text-sm">{node.name}</span>
+        </div>
+      )}
+      {isDir && open && node.children?.map((c, i) => <FileTree key={i} node={c} onFileClick={onFileClick} depth={depth + 1} />)}
     </div>
   );
 };
-
-const FileTree: React.FC = () => {
-  const { root } = useFileTree();
-
-  return (
-    <div className="h-full bg-gray-900 text-gray-100 overflow-y-auto">
-      <div className="p-2 font-semibold text-xs uppercase text-gray-500 border-b border-gray-800">
-        Explorer
-      </div>
-      <FileTreeNode node={root} level={0} />
-    </div>
-  );
-};
-
-export default FileTree;

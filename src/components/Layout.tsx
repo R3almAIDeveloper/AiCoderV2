@@ -9,9 +9,6 @@ import { useWebContainer } from "../hooks/useWebContainer";
 import { FileNode } from "../types";
 
 export const Layout: React.FC = () => {
-  // ----------------------------------------------------------------------
-  // File system state
-  // ----------------------------------------------------------------------
   const [files, setFiles] = useState<Record<string, string>>({
     "src/main.tsx": `import React from "react";
 import ReactDOM from "react-dom/client";
@@ -23,26 +20,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>
 );`,
-    "src/App.tsx": `import { useState } from "react";
-
-export default function App() {
-  const [count, setCount] = useState(0);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Vite + React + Tailwind</h1>
-        <button
-          onClick={() => setCount((c) => c + 1)}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          count is {count}
-        </button>
-      </div>
-    </div>
-  );
-}
-`,
+    "src/App.tsx": `import { Layout } from "./components/Layout";
+export default function App() { return <Layout />; }`,
     "src/index.css": `@tailwind base;
 @tailwind components;
 @tailwind utilities;`,
@@ -61,20 +40,13 @@ export default function App() {
 </html>`,
     "vite.config.ts": `import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-
-export default defineConfig({
-  plugins: [react()],
-});
-`,
+export default defineConfig({ plugins: [react()] });`,
     "tailwind.config.js": `/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
-  theme: {
-    extend: {},
-  },
+  theme: { extend: {} },
   plugins: [],
-};
-`,
+};`,
     "package.json": `{
   "name": "r3alm-dev",
   "private": true,
@@ -99,226 +71,123 @@ module.exports = {
     "typescript": "^5.5.0",
     "vite": "^5.4.0"
   }
-}
-`,
+}`
   });
 
-  // ----------------------------------------------------------------------
-  // Editor state
-  // ----------------------------------------------------------------------
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [openTabs, setOpenTabs] = useState<string[]>([]);
 
-  const openFile = useCallback(
-    (path: string) => {
-      if (!openTabs.includes(path)) {
-        setOpenTabs((prev) => [...prev, path]);
-      }
-      setActiveFile(path);
-    },
-    [openTabs]
-  );
+  const openFile = useCallback((path: string) => {
+    if (!openTabs.includes(path)) setOpenTabs(p => [...p, path]);
+    setActiveFile(path);
+  }, [openTabs]);
 
   const closeTab = (path: string) => {
     const idx = openTabs.indexOf(path);
     if (idx === -1) return;
-
-    const newTabs = openTabs.filter((t) => t !== path);
+    const newTabs = openTabs.filter(t => t !== path);
     setOpenTabs(newTabs);
-
     if (activeFile === path) {
-      // pick next tab or first one
-      const next = newTabs[idx] ?? newTabs[idx - 1] ?? null;
-      setActiveFile(next);
+      setActiveFile(newTabs[idx] ?? newTabs[idx - 1] ?? null);
     }
   };
 
-  // ----------------------------------------------------------------------
-  // WebContainer integration
-  // ----------------------------------------------------------------------
-  const { container, ready, installDependencies, startDevServer } =
-    useWebContainer();
+  const { container, ready, installDependencies, startDevServer } = useWebContainer();
 
   useEffect(() => {
     if (!ready || !container) return;
-
-    const writeAllFiles = async () => {
-      for (const [path, content] of Object.entries(files)) {
-        const dirs = path.split("/").slice(0, -1);
-        let current = "";
-        for (const dir of dirs) {
-          current += dir + "/";
-          await container.fs.mkdir(current, { recursive: true });
+    const write = async () => {
+      for (const [p, c] of Object.entries(files)) {
+        const dirs = p.split("/").slice(0, -1);
+        let cur = "";
+        for (const d of dirs) {
+          cur += d + "/";
+          await container.fs.mkdir(cur, { recursive: true });
         }
-        await container.fs.writeFile(path, content);
+        await container.fs.writeFile(p, c);
       }
-
       await installDependencies();
       await startDevServer();
     };
-
-    writeAllFiles();
+    write();
   }, [ready, container, files, installDependencies, startDevServer]);
 
-  // ----------------------------------------------------------------------
-  // File change handling (editor → files → container)
-  // ----------------------------------------------------------------------
   const handleFileChange = async (path: string, content: string) => {
-    setFiles((prev) => ({ ...prev, [path]: content }));
-    if (container) {
-      await container.fs.writeFile(path, content);
-    }
+    setFiles(p => ({ ...p, [path]: content }));
+    if (container) await container.fs.writeFile(path, content);
   };
 
-  // ----------------------------------------------------------------------
-  // AI → new file handling
-  // ----------------------------------------------------------------------
   useEffect(() => {
-    const handleAddFile = (
-      e: CustomEventInit<{ filename: string; code: string }>
-    ) => {
+    const handler = (e: CustomEventInit<{ filename: string; code: string }>) => {
       const { filename, code } = e.detail;
-      const fullPath = filename.startsWith("src/") ? filename : `src/${filename}`;
-
-      setFiles((prev) => ({ ...prev, [fullPath]: code }));
-      openFile(fullPath);
+      const full = filename.startsWith("src/") ? filename : `src/${filename}`;
+      setFiles(p => ({ ...p, [full]: code }));
+      openFile(full);
     };
-
-    window.addEventListener("addFile", handleAddFile as EventListener);
-    return () => window.removeEventListener("addFile", handleAddFile as EventListener);
+    window.addEventListener("addFile", handler as EventListener);
+    return () => window.removeEventListener("addFile", handler as EventListener);
   }, [openFile]);
 
-  // ----------------------------------------------------------------------
-  // Helper: build tree structure for FileTree
-  // ----------------------------------------------------------------------
-  const buildTree = (filesObj: Record<string, string>): FileNode => {
+  const buildTree = (obj: Record<string, string>): FileNode => {
     const root: FileNode = { name: "", path: "", type: "directory", children: [] };
-
-    Object.keys(filesObj).forEach((filePath) => {
-      const parts = filePath.split("/");
-      let current = root;
-
-      parts.forEach((part, idx) => {
+    Object.keys(obj).forEach(p => {
+      const parts = p.split("/");
+      let cur = root;
+      parts.forEach((part, i) => {
         if (!part) return;
-        const isFile = idx === parts.length - 1;
-        let node = current.children?.find((c) => c.name === part);
-
+        const file = i === parts.length - 1;
+        let node = cur.children!.find(c => c.name === part);
         if (!node) {
-          node = {
-            name: part,
-            path: parts.slice(0, idx + 1).join("/"),
-            type: isFile ? "file" : "directory",
-            children: isFile ? undefined : [],
-          };
-          current.children!.push(node);
+          node = { name: part, path: parts.slice(0, i + 1).join("/"), type: file ? "file" : "directory", children: file ? undefined : [] };
+          cur.children!.push(node);
         }
-        if (!isFile) current = node;
+        if (!file) cur = node;
       });
     });
-
     return root;
   };
 
   const fileTree = buildTree(files);
 
-  // ----------------------------------------------------------------------
-  // Render
-  // ----------------------------------------------------------------------
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-      {/* Header */}
       <header className="border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between bg-white dark:bg-gray-800">
         <h1 className="text-xl font-bold">R3alm Dev</h1>
         <div className="flex items-center space-x-2 text-sm">
-          {ready ? (
-            <span className="text-green-600">WebContainer ready</span>
-          ) : (
-            <span className="text-orange-600">Booting WebContainer…</span>
-          )}
+          {ready ? <span className="text-green-600">WebContainer ready</span> : <span className="text-orange-600">Booting…</span>}
         </div>
       </header>
 
-      {/* Main layout – four panes */}
       <PanelGroup direction="horizontal" className="flex-1">
-        {/* Left: Chat */}
-        <Panel defaultSize={25} minSize={15}>
-          <ChatInterface />
-        </Panel>
-
+        <Panel defaultSize={25} minSize={15}><ChatInterface /></Panel>
         <PanelResizeHandle className="w-1 bg-gray-300 dark:bg-gray-700 hover:bg-blue-500 transition-colors" />
-
-        {/* Center-left: File Tree */}
         <Panel defaultSize={20} minSize={15}>
           <div className="h-full bg-gray-100 dark:bg-gray-800 flex flex-col">
-            <div className="border-b border-gray-300 dark:border-gray-700 px-3 py-2 font-medium">
-              Explorer
-            </div>
-            <div className="flex-1 overflow-auto p-2">
-              <FileTree
-                node={fileTree}
-                onFileClick={(path) => openFile(path)}
-                depth={0}
-              />
-            </div>
+            <div className="border-b border-gray-300 dark:border-gray-700 px-3 py-2 font-medium">Explorer</div>
+            <div className="flex-1 overflow-auto p-2"><FileTree node={fileTree} onFileClick={openFile} depth={0} /></div>
           </div>
         </Panel>
-
         <PanelResizeHandle className="w-1 bg-gray-300 dark:bg-gray-700 hover:bg-blue-500 transition-colors" />
-
-        {/* Center-right: Editor + Tabs */}
         <Panel defaultSize={35} minSize={25}>
           <div className="h-full flex flex-col bg-white dark:bg-gray-900">
-            {/* Tabs */}
             {openTabs.length > 0 && (
               <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto bg-gray-50 dark:bg-gray-800">
-                {openTabs.map((tab) => (
-                  <div
-                    key={tab}
-                    className={`flex items-center px-3 py-1 text-sm cursor-pointer border-r border-gray-200 dark:border-gray-700 ${
-                      activeFile === tab
-                        ? "bg-white dark:bg-gray-900 text-blue-600"
-                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    }`}
-                    onClick={() => setActiveFile(tab)}
-                  >
-                    <span className="truncate max-w-xs">{tab.split("/").pop()}</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeTab(tab);
-                      }}
-                      className="ml-2 text-gray-500 hover:text-red-600"
-                    >
-                      ×
-                    </button>
+                {openTabs.map(t => (
+                  <div key={t} className={`flex items-center px-3 py-1 text-sm cursor-pointer border-r border-gray-200 dark:border-gray-700 ${activeFile === t ? "bg-white dark:bg-gray-900 text-blue-600" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`} onClick={() => setActiveFile(t)}>
+                    <span className="truncate max-w-xs">{t.split("/").pop()}</span>
+                    <button onClick={e => { e.stopPropagation(); closeTab(t); }} className="ml-2 text-gray-500 hover:text-red-600">×</button>
                   </div>
                 ))}
               </div>
             )}
-
-            {/* Editor */}
             <div className="flex-1">
-              {activeFile ? (
-                <MonacoEditor
-                  path={activeFile}
-                  value={files[activeFile] || ""}
-                  onChange={(value) => handleFileChange(activeFile, value || "")}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
-                  Open a file to start editing
-                </div>
-              )}
+              {activeFile ? <MonacoEditor path={activeFile} value={files[activeFile] || ""} onChange={v => handleFileChange(activeFile, v || "")} /> :
+                <div className="h-full flex items-center justify-center text-gray-500">Open a file to start editing</div>}
             </div>
           </div>
         </Panel>
-
         <PanelResizeHandle className="w-1 bg-gray-300 dark:bg-gray-700 hover:bg-blue-500 transition-colors" />
-
-        {/* Right: Preview */}
-        <Panel defaultSize={30} minSize={20}>
-          <Preview />
-        </Panel>
+        <Panel defaultSize={30} minSize={20}><Preview /></Panel>
       </PanelGroup>
     </div>
   );

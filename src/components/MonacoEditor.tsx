@@ -1,68 +1,37 @@
 // src/components/MonacoEditor.tsx
-import React, { useEffect, useRef } from 'react';
-import { useFileTree } from '../hooks/useFileTree';
-import * as monaco from 'monaco-editor';
+import * as monaco from "monaco-editor";
+import { useEffect, useRef } from "react";
 
-const MonacoEditor: React.FC = () => {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const monacoRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const { selectedFilePath, getFileContent, updateFile } = useFileTree();
+interface Props {
+  path: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export const MonacoEditor: React.FC<Props> = ({ path, value, onChange }) => {
+  const divRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
   useEffect(() => {
-    if (!editorRef.current || !selectedFilePath) return;
+    if (!divRef.current) return;
+    editorRef.current = monaco.editor.create(divRef.current, {
+      value,
+      language: path.endsWith(".tsx") ? "typescript" : path.endsWith(".ts") ? "typescript" : "javascript",
+      theme: "vs-dark",
+      automaticLayout: true,
+      minimap: { enabled: false },
+    });
+    editorRef.current.onDidChangeModelContent(() => {
+      onChange(editorRef.current?.getValue() ?? "");
+    });
+    return () => editorRef.current?.dispose();
+  }, [path]);
 
-    const content = getFileContent(selectedFilePath) || '';
-    const language = selectedFilePath.endsWith('.tsx') ? 'typescript' : 'javascript';
-
-    if (!monacoRef.current) {
-      // Create editor
-      monacoRef.current = monaco.editor.create(editorRef.current, {
-        value: content,
-        language,
-        theme: 'vs-dark',
-        automaticLayout: true,
-        minimap: { enabled: false },
-        scrollBeyondLastLine: false,
-      });
-
-      monacoRef.current.onDidChangeModelContent(() => {
-        const value = monacoRef.current?.getValue();
-        if (value !== undefined && selectedFilePath) {
-          updateFile(selectedFilePath, value);
-        }
-      });
-    } else {
-      // Update existing editor
-      const model = monacoRef.current.getModel();
-      if (model) {
-        if (model.getValue() !== content) {
-          model.setValue(content);
-        }
-        const currentLang = monaco.editor.getModelLanguage(model);
-        if (currentLang !== language) {
-          monaco.editor.setModelLanguage(model, language);
-        }
-      }
+  useEffect(() => {
+    if (editorRef.current && value !== editorRef.current.getValue()) {
+      editorRef.current.setValue(value);
     }
-  }, [selectedFilePath, getFileContent, updateFile]);
+  }, [value]);
 
-  useEffect(() => {
-    return () => {
-      monacoRef.current?.dispose();
-    };
-  }, []);
-
-  return (
-    <div className="h-full bg-gray-950">
-      {selectedFilePath ? (
-        <div ref={editorRef} className="h-full" />
-      ) : (
-        <div className="flex items-center justify-center h-full text-gray-500">
-          Select a file to edit
-        </div>
-      )}
-    </div>
-  );
+  return <div ref={divRef} className="h-full w-full" />;
 };
-
-export default MonacoEditor;
