@@ -19,18 +19,21 @@ const FileTree: React.FC<FileTreeProps> = ({ className, style }) => {
 
   const tree = useMemo(() => {
     const paths = Object.keys(files);
-    console.log('FileTree: Received', paths.length, 'files:', paths);
+    console.log('FileTree: Building tree from', paths.length, 'files:', paths);
     return buildTree(paths);
   }, [files]);
 
   useEffect(() => {
-    console.log('FileTree rendered with', Object.keys(files).length, 'files');
+    console.log('FileTree: Rendered with', Object.keys(files).length, 'files');
   }, [files]);
 
   if (Object.keys(files).length === 0) {
     return (
       <div className={`p-4 text-gray-500 text-sm ${className}`} style={style}>
-        Loading project files...
+        <div className="flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          Loading project files...
+        </div>
       </div>
     );
   }

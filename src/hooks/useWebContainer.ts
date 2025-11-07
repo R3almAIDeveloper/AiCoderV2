@@ -11,14 +11,10 @@ export const useWebContainer = () => {
 
     (async () => {
       try {
+        console.log('Booting WebContainer...');
         const instance = await WebContainer.boot();
 
-        // Wait for WebContainer to be fully ready
-        await new Promise((resolve) => {
-          instance.on('ready', resolve);
-        });
-
-        // Mount a complete sample React + TypeScript + Vite project
+        console.log('WebContainer booted. Mounting files...');
         await instance.mount({
           'package.json': {
             file: {
@@ -325,31 +321,34 @@ export default Footer;
           },
         });
 
-        // Fetch initial files with delay to ensure mount completes
-        setTimeout(async () => {
-          if (!isMounted) return;
-          const initialFiles = await getFiles(instance);
-          setFiles(initialFiles);
-        }, 500);
+        console.log('Files mounted. Reading file system...');
+
+        // Force immediate file read
+        const initialFiles = await getFiles(instance);
+        console.log('Initial files loaded:', Object.keys(initialFiles));
+        if (isMounted) setFiles(initialFiles);
 
         // Install dependencies
+        console.log('Installing dependencies...');
         const installProcess = await instance.spawn('npm', ['install']);
-        await installProcess.exit;
+        const installExit = await installProcess.exit;
+        console.log('npm install exited with code:', installExit);
 
         // Start dev server
+        console.log('Starting dev server...');
         const devProcess = await instance.spawn('npm', ['run', 'dev']);
 
         instance.on('server-ready', (port, serverUrl) => {
-          if (isMounted) {
-            console.log('Preview ready at:', serverUrl);
-            setUrl(serverUrl);
-          }
+          console.log('Preview server ready at:', serverUrl);
+          if (isMounted) setUrl(serverUrl);
         });
 
-        instance.on('error', (err) => console.error('WebContainer error:', err));
+        instance.on('error', (err) => {
+          console.error('WebContainer error:', err);
+        });
 
-        // Listen for file changes
         instance.on('fs-change', async () => {
+          console.log('FS change detected, updating files...');
           if (isMounted) {
             const updatedFiles = await getFiles(instance);
             setFiles(updatedFiles);
@@ -378,8 +377,12 @@ export default Footer;
 // Helper to get all files recursively
 async function getFiles(wc: WebContainer): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
+  const visited = new Set<string>();
 
   async function recurse(path: string) {
+    if (visited.has(path)) return;
+    visited.add(path);
+
     try {
       const entries = await wc.fs.readdir(path, { withFileTypes: true });
       for (const entry of entries) {
@@ -387,8 +390,12 @@ async function getFiles(wc: WebContainer): Promise<Record<string, string>> {
         if (entry.isDirectory()) {
           await recurse(fullPath);
         } else if (entry.isFile()) {
-          const content = await wc.fs.readFile(fullPath, 'utf-8');
-          files[fullPath] = content;
+          try {
+            const content = await wc.fs.readFile(fullPath, 'utf-8');
+            files[fullPath] = content;
+          } catch (readErr) {
+            console.warn(`Failed to read file ${fullPath}:`, readErr);
+          }
         }
       }
     } catch (err) {
