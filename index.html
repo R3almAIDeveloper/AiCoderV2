@@ -9,16 +9,16 @@
   <body>
     <div id="root"></div>
 
-    <!-- THIS MUST BE THE VERY FIRST SCRIPT -->
+    <!-- WEBCONTAINER BOOT SCRIPT (WORKING VERSION) -->
     <script type="module">
-      // Boot WebContainer ASAP - before React mounts
       window.__bootWebContainer = async () => {
         const { WebContainer } = await import(
-          'https://cdn.jsdelivr.net/npm/@webcontainer/api@1.6.1/dist/standalone.js'
+          'https://cdn.jsdelivr.net/npm/@webcontainer/api@1.2.0/dist/standalone.js'
         );
+        console.log('WebContainer loaded from CDN');
         return WebContainer;
       };
-      console.log('WebContainer boot script LOADED');
+      console.log('WebContainer boot script READY');
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
