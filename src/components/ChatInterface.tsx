@@ -1,5 +1,6 @@
-import React, { useState, CSSProperties } from 'react';
-import { Send, Paperclip, Sparkles } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Sparkles } from 'lucide-react';
+import { generateCode } from '../services/xaiService';
 
 interface ChatInterfaceProps {
   className?: string;
@@ -13,21 +14,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
     { id: 3, text: 'Generating...', sender: 'ai', steps: ['Create initial files', 'Install dependencies', 'npm install'] },
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (input.trim()) {
-      setMessages([...messages, { id: messages.length + 1, text: input, sender: 'user' }]);
+      const userMessage = { id: messages.length + 1, text: input, sender: 'user' };
+      setMessages([...messages, userMessage]);
       setInput('');
-      // Simulate AI response - integrate real aiService here
-      setTimeout(() => {
-        setMessages((prev) => [...prev, { id: prev.length + 1, text: 'Processing your request...', sender: 'ai', steps: ['Step 1', 'Step 2'] }]);
-      }, 1000);
+      setIsLoading(true);
+
+      try {
+        const code = await generateCode(input);
+        const aiMessage = { id: messages.length + 2, text: code, sender: 'ai' };
+        setMessages(prev => [...prev, aiMessage]);
+      } catch (error) {
+        const errorMessage = { id: messages.length + 2, text: `Error: ${error.message}`, sender: 'ai' };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
   return (
     <div className={`flex flex-col h-full ${className}`} style={style}>
-      <div className="flex-1 overflow-y-auto space-y-4">
+      <div className="flex-1 overflow-y-auto space-y-4 p-4">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -47,19 +58,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
             )}
           </div>
         ))}
+        {isLoading && (
+          <div className="p-3 rounded-lg bg-gray-700 mr-auto max-w-[80%]">
+            <p className="text-sm">Generating code with xAI...</p>
+          </div>
+        )}
       </div>
-      <div className="mt-4 flex items-center border-t border-gray-700 pt-4">
-        <button className="text-gray-400 hover:text-white mr-2">
-          <Paperclip size={20} />
-        </button>
+      <div className="mt-4 flex items-center border-t border-gray-700 pt-4 px-4">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSend()}
           className="flex-1 bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
           placeholder="Ask AI to generate code..."
+          disabled={isLoading}
         />
-        <button onClick={handleSend} className="ml-2 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600">
+        <button onClick={handleSend} disabled={isLoading || !input.trim()} className="ml-2 bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 disabled:opacity-50">
           <Send size={20} />
         </button>
       </div>
