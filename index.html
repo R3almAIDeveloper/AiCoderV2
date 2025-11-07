@@ -2,13 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AiCoderV2</title>
-    <!-- ADD THIS LINE -->
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval'; worker-src 'self' blob:; child-src 'self' blob:;" />
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- THIS MUST BE THE VERY FIRST SCRIPT -->
+    <script type="module">
+      // Boot WebContainer ASAP - before React mounts
+      window.__bootWebContainer = async () => {
+        const { WebContainer } = await import(
+          'https://cdn.jsdelivr.net/npm/@webcontainer/api@1.6.1/dist/standalone.js'
+        );
+        return WebContainer;
+      };
+      console.log('WebContainer boot script LOADED');
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
