@@ -11,40 +11,43 @@ export const useWebContainer = () => {
     let process: any = null;
 
     const boot = async () => {
-      if (!window.__bootWebContainer) {
-        console.error('WebContainer boot script not loaded');
-        return;
-      }
+      if (!window.__bootWebContainer) return;
 
-      console.log('Booting WebContainer...');
       const WebContainer = await window.__bootWebContainer();
       const instance = await WebContainer.boot();
 
-      // Full sample app (same as before)
+      // FULL SAMPLE APP
       await instance.mount({
         'package.json': { file: { contents: JSON.stringify({
-          name: 'sample-react-app',
+          name: 'aicoder-v2',
           type: 'module',
-          dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1' },
+          dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1', 'lucide-react': '^0.263.1' },
           devDependencies: {
             '@types/react': '^18.3.3',
             '@types/react-dom': '^18.3.0',
             '@vitejs/plugin-react': '^4.3.1',
             typescript: '^5.5.3',
             vite: '^5.4.1',
+            tailwindcss: '^3.4.0',
+            autoprefixer: '^10.4.20',
+            postcss: '^8.4.41'
           },
-          scripts: { dev: 'vite --port 3111' },
+          scripts: { dev: 'vite --port 3111' }
         }, null, 2) }},
         'vite.config.ts': { file: { contents: `
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 export default defineConfig({ plugins: [react()], server: { port: 3111 } });
         `.trim() }},
+        'tailwind.config.js': { file: { contents: `
+/** @type {import('tailwindcss').Config} */
+export default { content: ['./index.html', './src/**/*.{ts,tsx}'], theme: { extend: {} }, plugins: [] }
+        `.trim() }},
+        'postcss.config.js': { file: { contents: `export default { plugins: { tailwindcss: {}, autoprefixer: {} } }` } },
         'index.html': { file: { contents: `
-<!DOCTYPE html>
-<html><head><link rel="stylesheet" href="/src/index.css"></head>
-<body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
-</html>
+<!DOCTYPE html><html><head>
+<link rel="stylesheet" href="/src/index.css">
+</head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
         `.trim() }},
         'src': { directory: {
           'index.css': { file: { contents: `@tailwind base; @tailwind components; @tailwind utilities;` } },
@@ -56,54 +59,65 @@ import './index.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
           `.trim() }},
           'App.tsx': { file: { contents: `
-import React from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import Features from './components/Features';
 import Footer from './components/Footer';
 export default () => (
-  <div className="min-h-screen bg-gray-50">
+  <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
     <Header /><Hero /><Features /><Footer />
   </div>
 );
           `.trim() }},
           'components': { directory: {
             'Header.tsx': { file: { contents: `
-import { Menu } from 'lucide-react';
+import { Menu, Sparkles } from 'lucide-react';
 export default () => (
-  <header className="bg-white shadow">
-    <div className="max-w-7xl mx-auto px-4 flex justify-between items-center h-16">
-      <h1 className="text-2xl font-bold text-blue-600">MyApp</h1>
-      <button><Menu size={24} /></button>
+  <header className="bg-white/80 backdrop-blur-md shadow-lg sticky top-0 z-50">
+    <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+      <div className="flex items-center gap-3">
+        <Sparkles className="w-8 h-8 text-purple-600" />
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+          AiCoder V2
+        </h1>
+      </div>
+      <button className="p-2 hover:bg-gray-100 rounded-lg"><Menu /></button>
     </div>
   </header>
 );
             `.trim() }},
             'Hero.tsx': { file: { contents: `
 export default () => (
-  <section className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-24">
-    <div className="max-w-7xl mx-auto px-4 text-center">
-      <h2 className="text-5xl font-bold mb-6">Build Amazing Apps</h2>
-      <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold">
-        Get Started
-      </button>
-    </div>
+  <section className="py-32 px-6 text-center">
+    <h2 className="text-6xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+      Code with AI, Ship Instantly
+    </h2>
+    <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
+      Full React + TypeScript + Tailwind IDE in your browser. Powered by xAI Grok.
+    </p>
+    <button className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-10 py-4 rounded-full text-lg font-semibold hover:scale-105 transition">
+      Start Coding Now
+    </button>
   </section>
 );
             `.trim() }},
             'Features.tsx': { file: { contents: `
-import { Zap, Shield, Rocket } from 'lucide-react';
+import { Zap, Brain, Rocket } from 'lucide-react';
+const feats = [
+  { icon: Zap, title: 'Lightning Fast', desc: 'Vite + WebContainer' },
+  { icon: Brain, title: 'AI Powered', desc: 'xAI Grok edits code live' },
+  { icon: Rocket, title: 'Production Ready', desc: 'Tailwind + TypeScript' }
+];
 export default () => (
-  <section className="py-20">
-    <div className="max-w-7xl mx-auto px-4 text-center">
-      <h2 className="text-4xl font-bold mb-12">Powerful Features</h2>
-      <div className="grid md:grid-cols-3 gap-8">
-        {[{icon: Zap, title: 'Fast'}, {icon: Shield, title: 'Safe'}, {icon: Rocket, title: 'Ready'}].map(f => (
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <f.icon className="w-8 h-8 text-blue-600" />
-            </div>
-            <h3 className="text-xl font-semibold">{f.title}</h3>
+  <section className="py-24 px-6 bg-white">
+    <div className="max-w-7xl mx-auto">
+      <h2 className="text-4xl font-bold text-center mb-16">Why Developers Love It</h2>
+      <div className="grid md:grid-cols-3 gap-10">
+        {feats.map(f => (
+          <div className="text-center p-8 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl">
+            <f.icon className="w-16 h-16 mx-auto mb-4 text-purple-600" />
+            <h3 className="text-2xl font-bold mb-2">{f.title}</h3>
+            <p className="text-gray-600">{f.desc}</p>
           </div>
         ))}
       </div>
@@ -114,37 +128,35 @@ export default () => (
             'Footer.tsx': { file: { contents: `
 export default () => (
   <footer className="bg-gray-900 text-white py-12 text-center">
-    <p>&copy; 2025 MyApp. All rights reserved.</p>
+    <p className="text-lg">Built with <span className="text-pink-500">♥</span> by R3almAIDeveloper</p>
+    <p className="text-sm text-gray-400 mt-2">WebContainer + xAI + React = Future</p>
   </footer>
 );
-            `.trim() }},
+            `.trim() }}
           }}
         }}
       });
 
-      // READ FILES
-      const walk = async (path: string): Promise<Record<string, string>> => {
-        const files: Record<string, string> = {};
-        const entries = await instance.fs.readdir(path, { withFileTypes: true });
-        for (const e of entries) {
-          const full = path === '/' ? `/${e.name}` : `${path}/${e.name}`;
-          if (e.isDirectory()) Object.assign(files, await walk(full));
-          else files[full] = await instance.fs.readFile(full, 'utf-8');
-        }
-        return files;
+      const readAll = async () => {
+        const result: Record<string, string> = {};
+        const walk = async (path: string) => {
+          const entries = await instance.fs.readdir(path, { withFileTypes: true });
+          for (const e of entries) {
+            const full = path === '/' ? `/${e.name}` : `${path}/${e.name}`;
+            if (e.isDirectory()) await walk(full);
+            else result[full] = await instance.fs.readFile(full, 'utf-8');
+          }
+        };
+        await walk('/');
+        return result;
       };
 
-      const allFiles = await walk('/');
-      console.log('FILES LOADED:', Object.keys(allFiles));
+      const allFiles = await readAll();
       if (mounted) setFiles(allFiles);
 
-      // Install & run
-      const install = await instance.spawn('npm', ['install']);
-      await install.exit;
+      await instance.spawn('npm', ['install']).exit;
       process = await instance.spawn('npm', ['run', 'dev']);
-
       instance.on('server-ready', (_: any, url: string) => {
-        console.log('PREVIEW URL:', url);
         if (mounted) setUrl(url);
       });
 
