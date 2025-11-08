@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { WebContainer } from '@webcontainer/api';
 
-let globalInstance: WebContainer | null = null;
-let globalDevProcess: any = null;
+let globalWebContainer: WebContainer | null = null;
 
 export const useWebContainer = () => {
   const [wc, setWc] = useState<WebContainer | null>(null);
@@ -14,20 +13,20 @@ export const useWebContainer = () => {
 
     (async () => {
       try {
-        if (globalInstance) {
-          console.log('Using existing global WebContainer instance');
-          const instance = globalInstance;
+        if (globalWebContainer) {
+          console.log('Using existing WebContainer instance');
+          const instance = globalWebContainer;
           const initialFiles = await getFiles(instance);
           if (isMounted) setFiles(initialFiles);
           if (isMounted) setWc(instance);
           return;
         }
 
-        console.log('Booting new WebContainer...');
+        console.log('Booting new WebContainer instance');
         const instance = await WebContainer.boot();
-        globalInstance = instance;
+        globalWebContainer = instance;
 
-        // Mount initial project files
+        // Mount initial project files for a basic Vite + React setup
         await instance.mount({
           'package.json': {
             file: {
@@ -136,7 +135,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         await installProcess.exit;
 
         // Start dev server
-        globalDevProcess = await instance.spawn('npm', ['run', 'dev']);
+        const devProcess = await instance.spawn('npm', ['run', 'dev']);
 
         instance.on('server-ready', (port, serverUrl) => {
           if (isMounted) setUrl(serverUrl);
@@ -155,10 +154,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         if (isMounted) setWc(instance);
 
         return () => {
-          globalDevProcess?.kill();
+          devProcess.kill();
           instance.destroy();
-          globalInstance = null;
-          globalDevProcess = null;
+          globalWebContainer = null;
         };
       } catch (error) {
         console.error('Failed to boot WebContainer:', error);

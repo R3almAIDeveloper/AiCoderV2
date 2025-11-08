@@ -41,34 +41,39 @@ const TreeNodeComponent: React.FC<{
   setCurrentFile: (file: string | null) => void;
   depth?: number;
 }> = ({ node, setCurrentFile, depth = 0 }) => {
-  const [open, setOpen] = React.useState(depth < 2); // Open top 2 levels by default
+  const [open, setOpen] = React.useState(depth < 2);
 
   if (!node.isDirectory) {
     return (
       <li
-        className="flex items-center cursor-pointer hover:bg-gray-700 p-1 rounded"
-        style={{ paddingLeft: `${depth * 16}px` }}
+        className="flex items-center cursor-pointer hover:bg-gray-700 px-2 py-1 rounded text-sm"
+        style={{ paddingLeft: `${depth * 12 + 20}px` }}
         onClick={() => setCurrentFile(node.path)}
       >
-        <FileText size={16} className="mr-2 text-gray-400" />
-        {node.name}
+        <FileText size={14} className="mr-2 text-gray-400" />
+        <span className="text-gray-300">{node.name}</span>
       </li>
     );
   }
 
   return (
-    <li style={{ paddingLeft: `${depth * 16}px` }}>
+    <li>
       <div
-        className="flex items-center cursor-pointer hover:bg-gray-700 p-1 rounded"
+        className="flex items-center cursor-pointer hover:bg-gray-700 px-2 py-1 rounded text-sm"
+        style={{ paddingLeft: `${depth * 12 + 4}px` }}
         onClick={() => setOpen(!open)}
       >
-        {open ? <ChevronDown size={16} className="mr-1" /> : <ChevronRight size={16} className="mr-1" />}
-        <Folder size={16} className="mr-2 text-yellow-500" />
-        {node.name}
+        {open ? (
+          <ChevronDown size={14} className="mr-1 text-gray-500" />
+        ) : (
+          <ChevronRight size={14} className="mr-1 text-gray-500" />
+        )}
+        <Folder size={14} className="mr-2 text-yellow-500" />
+        <span className="text-gray-300 font-medium">{node.name}</span>
       </div>
-      {open && (
-        <ul className="space-y-1">
-          {node.children?.map((child) => (
+      {open && node.children && (
+        <ul className="space-y-0.5">
+          {node.children.map((child) => (
             <TreeNodeComponent
               key={child.path}
               node={child}
