@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { WebContainer } from '@webcontainer/api';
 
-let globalWebContainer: WebContainer | null = null;
+let globalInstance: WebContainer | null = null;
+let globalDevProcess: any = null;
 
 export const useWebContainer = () => {
   const [wc, setWc] = useState<WebContainer | null>(null);
@@ -13,21 +14,20 @@ export const useWebContainer = () => {
 
     (async () => {
       try {
-        if (globalWebContainer) {
-          // Use existing global instance if booted
-          console.log('Using existing WebContainer instance');
-          const instance = globalWebContainer;
+        if (globalInstance) {
+          console.log('Using existing global WebContainer instance');
+          const instance = globalInstance;
           const initialFiles = await getFiles(instance);
           if (isMounted) setFiles(initialFiles);
           if (isMounted) setWc(instance);
           return;
         }
 
-        console.log('Booting new WebContainer instance...');
+        console.log('Booting new WebContainer...');
         const instance = await WebContainer.boot();
-        globalWebContainer = instance;
+        globalInstance = instance;
 
-        // Mount initial project files for a basic Vite + React setup
+        // Mount initial project files
         await instance.mount({
           'package.json': {
             file: {
@@ -127,29 +127,25 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
         });
 
-        console.log('Mount completed. Fetching initial files...');
+        // Fetch and set initial files
         const initialFiles = await getFiles(instance);
         if (isMounted) setFiles(initialFiles);
 
         // Install dependencies
-        console.log('Installing dependencies...');
         const installProcess = await instance.spawn('npm', ['install']);
         await installProcess.exit;
 
         // Start dev server
-        console.log('Starting dev server...');
-        const devProcess = await instance.spawn('npm', ['run', 'dev']);
+        globalDevProcess = await instance.spawn('npm', ['run', 'dev']);
 
         instance.on('server-ready', (port, serverUrl) => {
-          console.log('Server ready at', serverUrl);
           if (isMounted) setUrl(serverUrl);
         });
 
         instance.on('error', (err) => console.error('WebContainer error:', err));
 
         // Listen for file system changes and update files state
-        instance.on('file-system-change', async (changedPath) => {
-          console.log('FS change detected for', changedPath);
+        instance.on('fs-change', async (changedPath) => {
           if (isMounted) {
             const updatedFiles = await getFiles(instance);
             setFiles(updatedFiles);
@@ -159,9 +155,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         if (isMounted) setWc(instance);
 
         return () => {
-          devProcess.kill();
+          globalDevProcess?.kill();
           instance.destroy();
-          globalWebContainer = null;
+          globalInstance = null;
+          globalDevProcess = null;
         };
       } catch (error) {
         console.error('Failed to boot WebContainer:', error);
@@ -194,6 +191,5 @@ async function getFiles(wc: WebContainer): Promise<Record<string, string>> {
   }
 
   await recurse('/');
-  console.log('Fetched files:', Object.keys(files));
   return files;
 }
