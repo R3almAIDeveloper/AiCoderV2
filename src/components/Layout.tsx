@@ -45,14 +45,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { label: 'Logout', href: '/logout' },
   ];
 
-  const [fileTreeWidth, setFileTreeWidth] = useState(256);
-  const [editorWidth, setEditorWidth] = useState(600);
+  const [fileWidth, setFileWidth] = useState(256);
+  const [editorWidth, setEditorWidth] = useState(0);
+  const mainRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<'code' | 'preview' | 'database'>('code');
   const [currentFile, setCurrentFile] = useState<string | null>(null);
 
-  const { wc, files, url } = useWebContainer();
+  const { wc, files, url, refreshFiles } = useWebContainer();
 
-  const contextValue = { wc, files, url, currentFile, setCurrentFile };
+  useEffect(() => {
+    const updateWidths = () => {
+      if (mainRef.current) {
+        const totalMain = mainRef.current.clientWidth;
+        setEditorWidth((totalMain - fileWidth) / 2);
+      }
+    };
+
+    updateWidths();
+    window.addEventListener('resize', updateWidths);
+    return () => window.removeEventListener('resize', updateWidths);
+  }, [fileWidth]);
+
+  const contextValue = { wc, files, url, currentFile, setCurrentFile, refreshFiles };
 
   return (
     <WebContainerProvider value={contextValue}>
@@ -62,30 +76,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </header>
         <div className="flex flex-1 overflow-hidden">
           <ChatInterface className="w-80 flex-shrink-0 bg-gray-800 border-r border-gray-700 overflow-y-auto p-4 rounded-tr-lg" />
-          <div className="flex flex-col flex-1">
+          <div ref={mainRef} className="flex flex-col flex-1">
             <div className="flex flex-1 overflow-hidden">
               {mode === 'code' && (
                 <>
-                  <FileTree
-                    className="bg-gray-800 border-r border-gray-700 overflow-y-auto p-4"
-                    style={{ width: `${fileTreeWidth}px`, minWidth: '200px', maxWidth: '600px' }}
-                  />
+                  <FileTree className="bg-gray-800 border-r border-gray-700 overflow-y-auto p-4" style={{ width: `${fileWidth}px` }} />
                   <Resizer
                     onResize={(delta) => {
-                      const newWidth = Math.max(200, Math.min(600, fileTreeWidth + delta));
-                      setFileTreeWidth(newWidth);
+                      setFileWidth(Math.max(200, fileWidth + delta));
+                      setEditorWidth(Math.max(200, editorWidth - delta));
                     }}
                   />
-                  <MonacoEditor
-                    className="bg-gray-900 overflow-hidden"
-                    style={{ width: `${editorWidth}px`, minWidth: '300px' }}
-                  />
-                  <Resizer
-                    onResize={(delta) => {
-                      const newWidth = Math.max(300, editorWidth + delta);
-                      setEditorWidth(newWidth);
-                    }}
-                  />
+                  <MonacoEditor className="bg-gray-900 overflow-hidden" style={{ width: `${editorWidth}px` }} />
+                  <Resizer onResize={(delta) => setEditorWidth(Math.max(200, editorWidth + delta))} />
                   <Preview className="flex-1 bg-gray-800 overflow-hidden border-l border-gray-700" />
                 </>
               )}

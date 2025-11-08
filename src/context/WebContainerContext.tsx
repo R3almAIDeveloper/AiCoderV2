@@ -7,6 +7,7 @@ interface WebContainerContextType {
   url: string | null;
   currentFile: string | null;
   setCurrentFile: (file: string | null) => void;
+  refreshFiles: () => Promise<void>;
 }
 
 const WebContainerContext = createContext<WebContainerContextType | undefined>(undefined);

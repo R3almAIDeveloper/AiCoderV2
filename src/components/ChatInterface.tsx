@@ -1,5 +1,5 @@
 import React, { CSSProperties, useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, FilePlus } from 'lucide-react';
+import { Send, Paperclip, Sparkles } from 'lucide-react';
 import { useWebContainerContext } from '../context/WebContainerContext';
 import { generateCode } from '../services/xaiService';
 
@@ -18,7 +18,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { wc, setCurrentFile } = useWebContainerContext();
+  const { wc, refreshFiles, setCurrentFile } = useWebContainerContext();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -37,16 +37,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
 
       try {
         const code = await generateCode(input);
-        const fileName = `src/components/${input.split(' ')[0] || 'GeneratedComponent'}.tsx`.toLowerCase();
+        const fileName = `/src/components/${input.split(' ')[0] || 'Generated'}.tsx`.toLowerCase();
         if (wc) {
           await wc.fs.writeFile(fileName, code);
+          await refreshFiles(); // Manually refresh file list
           setCurrentFile(fileName);
-          const aiMessage = { id: messages.length + 2, text: `Generated and saved to ${fileName}:\n\`\`\`tsx\n${code}\n\`\`\``, sender: 'ai' };
-          setMessages(prev => [...prev, aiMessage]);
-        } else {
-          const aiMessage = { id: messages.length + 2, text: `Generated code (save manually):\n\`\`\`tsx\n${code}\n\`\`\``, sender: 'ai' };
-          setMessages(prev => [...prev, aiMessage]);
         }
+        const aiMessage = { id: messages.length + 2, text: `Generated code and saved to ${fileName}:\n\`\`\`tsx\n${code}\n\`\`\``, sender: 'ai' };
+        setMessages(prev => [...prev, aiMessage]);
       } catch (error: any) {
         const errorMessage = { id: messages.length + 2, text: `Error: ${error.message}`, sender: 'ai' };
         setMessages(prev => [...prev, errorMessage]);
@@ -63,10 +61,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
           <div
             key={msg.id}
             className={`p-3 rounded-lg ${
-              msg.sender === 'user' ? 'bg-blue-600 ml-auto max-w-[80%]' : 'bg-gray-700 mr-auto max-w-[80%]'
+              msg.sender === 'user' ? 'bg-blue-600 ml-auto max-w-[80%]' : 'bg-gray-700 mr-auto max-w-[80%]' 
             }`}
           >
-            <p className="text-sm">{msg.text}</p>
+            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
             {msg.steps && (
               <ul className="mt-2 space-y-1">
                 {msg.steps.map((step, idx) => (
@@ -80,8 +78,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
         ))}
       </div>
       <div className="mt-4 flex items-center border-t border-gray-700 pt-4">
-        <button className="text-gray-400 hover:text-white mr-2" title="Attach file">
-          <FilePlus size={20} />
+        <button className="text-gray-400 hover:text-white mr-2">
+          <Paperclip size={20} />
         </button>
         <input
           value={input}
@@ -94,6 +92,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ className, style }) => {
           <Send size={20} />
         </button>
       </div>
+      <div ref={messagesEndRef} />
     </div>
   );
 };
