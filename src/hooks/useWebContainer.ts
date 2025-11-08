@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { WebContainer } from '@webcontainer/api';
 
+let globalWebContainer: WebContainer | null = null;
+
 export const useWebContainer = () => {
   const [wc, setWc] = useState<WebContainer | null>(null);
   const [files, setFiles] = useState<Record<string, string>>({});
@@ -11,7 +13,20 @@ export const useWebContainer = () => {
 
     (async () => {
       try {
+        if (globalWebContainer) {
+          // Use existing global instance if booted
+          console.log('Using existing WebContainer instance');
+          const instance = globalWebContainer;
+          const initialFiles = await getFiles(instance);
+          if (isMounted) setFiles(initialFiles);
+          if (isMounted) setWc(instance);
+          return;
+        }
+
+        console.log('Booting new WebContainer instance...');
         const instance = await WebContainer.boot();
+        globalWebContainer = instance;
+
         // Mount initial project files for a basic Vite + React setup
         await instance.mount({
           'package.json': {
@@ -112,25 +127,29 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
         });
 
-        // Fetch and set initial files
+        console.log('Mount completed. Fetching initial files...');
         const initialFiles = await getFiles(instance);
         if (isMounted) setFiles(initialFiles);
 
         // Install dependencies
+        console.log('Installing dependencies...');
         const installProcess = await instance.spawn('npm', ['install']);
         await installProcess.exit;
 
         // Start dev server
+        console.log('Starting dev server...');
         const devProcess = await instance.spawn('npm', ['run', 'dev']);
 
         instance.on('server-ready', (port, serverUrl) => {
+          console.log('Server ready at', serverUrl);
           if (isMounted) setUrl(serverUrl);
         });
 
         instance.on('error', (err) => console.error('WebContainer error:', err));
 
         // Listen for file system changes and update files state
-        instance.on('fs-change', async (changedPath) => {
+        instance.on('file-system-change', async (changedPath) => {
+          console.log('FS change detected for', changedPath);
           if (isMounted) {
             const updatedFiles = await getFiles(instance);
             setFiles(updatedFiles);
@@ -142,6 +161,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         return () => {
           devProcess.kill();
           instance.destroy();
+          globalWebContainer = null;
         };
       } catch (error) {
         console.error('Failed to boot WebContainer:', error);
@@ -174,5 +194,6 @@ async function getFiles(wc: WebContainer): Promise<Record<string, string>> {
   }
 
   await recurse('/');
+  console.log('Fetched files:', Object.keys(files));
   return files;
 }

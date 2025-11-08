@@ -1,4 +1,4 @@
-import React, { CSSProperties, useMemo, useEffect } from 'react';
+import React, { CSSProperties, useMemo } from 'react';
 import { useWebContainerContext } from '../context/WebContainerContext';
 import { Folder, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -17,26 +17,7 @@ interface TreeNode {
 const FileTree: React.FC<FileTreeProps> = ({ className, style }) => {
   const { files, setCurrentFile } = useWebContainerContext();
 
-  const tree = useMemo(() => {
-    const paths = Object.keys(files);
-    console.log('FileTree: Building tree from', paths.length, 'files:', paths);
-    return buildTree(paths);
-  }, [files]);
-
-  useEffect(() => {
-    console.log('FileTree: Rendered with', Object.keys(files).length, 'files');
-  }, [files]);
-
-  if (Object.keys(files).length === 0) {
-    return (
-      <div className={`p-4 text-gray-500 text-sm ${className}`} style={style}>
-        <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-          Loading project files...
-        </div>
-      </div>
-    );
-  }
+  const tree = useMemo(() => buildTree(Object.keys(files)), [files]);
 
   return (
     <div className={`overflow-auto ${className}`} style={style}>
@@ -60,39 +41,34 @@ const TreeNodeComponent: React.FC<{
   setCurrentFile: (file: string | null) => void;
   depth?: number;
 }> = ({ node, setCurrentFile, depth = 0 }) => {
-  const [open, setOpen] = React.useState(depth < 2);
+  const [open, setOpen] = React.useState(depth < 2); // Open top 2 levels by default
 
   if (!node.isDirectory) {
     return (
       <li
-        className="flex items-center cursor-pointer hover:bg-gray-700 px-2 py-1 rounded text-sm"
-        style={{ paddingLeft: `${depth * 12 + 20}px` }}
+        className="flex items-center cursor-pointer hover:bg-gray-700 p-1 rounded"
+        style={{ paddingLeft: `${depth * 16}px` }}
         onClick={() => setCurrentFile(node.path)}
       >
-        <FileText size={14} className="mr-2 text-gray-400" />
-        <span className="text-gray-300">{node.name}</span>
+        <FileText size={16} className="mr-2 text-gray-400" />
+        {node.name}
       </li>
     );
   }
 
   return (
-    <li>
+    <li style={{ paddingLeft: `${depth * 16}px` }}>
       <div
-        className="flex items-center cursor-pointer hover:bg-gray-700 px-2 py-1 rounded text-sm"
-        style={{ paddingLeft: `${depth * 12 + 4}px` }}
+        className="flex items-center cursor-pointer hover:bg-gray-700 p-1 rounded"
         onClick={() => setOpen(!open)}
       >
-        {open ? (
-          <ChevronDown size={14} className="mr-1 text-gray-500" />
-        ) : (
-          <ChevronRight size={14} className="mr-1 text-gray-500" />
-        )}
-        <Folder size={14} className="mr-2 text-yellow-500" />
-        <span className="text-gray-300 font-medium">{node.name}</span>
+        {open ? <ChevronDown size={16} className="mr-1" /> : <ChevronRight size={16} className="mr-1" />}
+        <Folder size={16} className="mr-2 text-yellow-500" />
+        {node.name}
       </div>
-      {open && node.children && (
-        <ul className="space-y-0.5">
-          {node.children.map((child) => (
+      {open && (
+        <ul className="space-y-1">
+          {node.children?.map((child) => (
             <TreeNodeComponent
               key={child.path}
               node={child}
@@ -106,12 +82,13 @@ const TreeNodeComponent: React.FC<{
   );
 };
 
+// Helper to build tree from file paths
 function buildTree(filePaths: string[]): TreeNode[] {
   const root: TreeNode[] = [];
   const sortedPaths = [...filePaths].sort();
 
   for (const path of sortedPaths) {
-    const parts = path.split('/').filter(Boolean);
+    const parts = path.split('/').filter((p) => p);
     let currentLevel = root;
     let currentPath = '';
 
